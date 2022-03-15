@@ -1,10 +1,12 @@
 import numpy as np
 from scan_simulator_2d import PyScanSimulator2D
 
+
 import rospy
 import tf
 from nav_msgs.msg import OccupancyGrid
 from tf.transformations import quaternion_from_euler
+import math as math
 
 class SensorModel:
 
@@ -19,11 +21,12 @@ class SensorModel:
         ####################################
         # TODO
         # Adjust these parameters
-        self.alpha_hit = 0
-        self.alpha_short = 0
-        self.alpha_max = 0
-        self.alpha_rand = 0
-        self.sigma_hit = 0
+        self.alpha_hit = 0.74
+        self.alpha_short = 0.07
+        self.alpha_max = 0.07
+        self.alpha_rand = 0.12
+        self.sigma_hit = 8.0
+        
 
         # Your sensor table will be a `table_width` x `table_width` np array:
         self.table_width = 201
@@ -69,7 +72,51 @@ class SensorModel:
         returns:
             No return type. Directly modify `self.sensor_model_table`.
         """
-        raise NotImplementedError
+        
+         
+        zmax=200
+        self.sensor_model_table=np.ones((201,201))
+        
+        phit=np.ones((201,201))
+        
+        
+        for z in range(201):
+            for d in range(201):
+                 #phit
+                if 0 <= z <= zmax:
+                    phit_i=1/math.sqrt(2*self.sigma_hit)*math.exp((-(z-d)**2)/(2*self.sigma_hit**2))
+                else:
+                    phit_i=0
+                phit[d,z]=phit_i
+                
+        summed=np.sum(phit,axis=1,keepdims=True)
+        phit_norm= phit/summed
+           
+        for z in range(201):
+            for d in range(201):
+              
+                
+                #pshort
+                if 0 <= z <= d and d!=0:
+                    pshort=2/d*(1-z/d)
+                else:
+                    pshort=0
+                    
+                #pmax
+                if  z == zmax:
+                    pmax=1
+                else:
+                    pmax=0
+                    
+                #prand
+                if 0 <= z <= zmax:
+                    prand=1/zmax
+                else:
+                    prand=0
+                self.sensor_model_table[d,z]=self.alpha_hit*phit_norm[d,z]+self.alpha_short*pshort+self.alpha_max*pmax+self.alpha_rand*prand
+        summed=np.sum(self.sensor_model_table,axis=1,keepdims=True)
+        self.sensor_model_table= self.sensor_model_table/summed
+        
 
     def evaluate(self, particles, observation):
         """
@@ -106,6 +153,28 @@ class SensorModel:
         scans = self.scan_sim.scan(particles)
 
         ####################################
+        zmax=200
+        scans=np.where(scans<0,0,scans)
+        scans=np.where(scans>zmax,zmax,scans)
+    
+        
+        
+        pix=observation*self.map_resolution*self.lidar_scale_to_map_scale
+        pix=np.where(pix<0,0,pix)
+        pix=np.where(pix>zmax,zmax,pix)
+        
+        
+        probs_whole=np.ones(np.size(scans))
+        for i in np.size(scans,2):
+            for j in np.size(scans,2):
+                probs_whole[i,j]=self.sensor_model_table[scans[i,j],pix[i,j]]
+                
+        return np.sum(probs_whole,axis=1)
+                
+        
+        
+        
+        
 
     def map_callback(self, map_msg):
         # Convert the map to a numpy array
@@ -135,3 +204,4 @@ class SensorModel:
         self.map_set = True
 
         print("Map initialized")
+        
