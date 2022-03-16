@@ -168,15 +168,18 @@ class SensorModel:
         pix=np.where(pix>zmax,zmax,pix)
         
         
-        probs_whole=np.ones(np.size(scans))
+        probs_whole=np.ones(np.shape(scans))
+        
         
         for i in range(np.size(scans,0)):
             for j in range(np.size(scans,1)):
                 aa=pix[j]
                 bb=scans[i,j]
                 dd=self.sensor_model_table[aa,bb]
-                # probs_whole[i,j]=(dd)**(1.0/2.2)
+                probs_whole[i,j]=(dd)**(1.0/2.2)
                 
+        
+        rospy.loginfo(probs_whole)
         return np.sum(probs_whole,axis=1)
                 
         
