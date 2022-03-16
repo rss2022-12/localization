@@ -1,3 +1,6 @@
+import numpy as np
+from math import pi, sin, cos, acos
+
 class MotionModel:
 
     def __init__(self):
@@ -31,8 +34,29 @@ class MotionModel:
         """
         
         ####################################
-        # TODO
+        
+        # for r in range(particles.shape[0]):
+        #     old_theta = particles[r][2]
+        #     R_part = np.array([[np.cos(old_theta), -np.sin(old_theta), 0.0], [np.sin(old_theta), np.cos(old_theta), 0.0], [0.0, 0.0, 1.0]])
+        #     particles[r] += np.matmul(R_part, odometry)
 
-        raise NotImplementedError
+        # return particles
+
+        old_thetas = particles[:, 2]
+        R_parts = np.zeros((old_thetas.shape[0], 3, 3))
+        R_parts[:, 0, 0] = np.cos(old_thetas)
+        R_parts[:, 0, 1] = -np.sin(old_thetas)
+        R_parts[:, 0, 2] = 0.0
+        R_parts[:, 1, 0] = np.sin(old_thetas)
+        R_parts[:, 1, 1] = np.cos(old_thetas)
+        R_parts[:, 1, 2] = 0.0
+        R_parts[:, 2, 0] = 0.0
+        R_parts[:, 2, 1] = 0.0
+        R_parts[:, 2, 2] = 1.0
+        particles += np.matmul(R_parts, odometry) + np.array([np.random.normal(0.0, 0.01)])
+        noise = np.array([np.random.normal(0.0, 0.01), np.random.normal(0.0, 0.01), np.random.normal(0.0, 0.01)])
+        particles += noise
+
+        return particles
 
         ####################################
