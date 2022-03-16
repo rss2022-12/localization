@@ -74,22 +74,22 @@ class SensorModel:
         """
         
          
-        zmax=200
-        self.sensor_model_table=np.ones((201,201))
+        zmax=200.0
+        self.sensor_model_table=np.zeros((201,201))
         
-        phit=np.ones((201,201))
+        phit=np.zeros((201,201))
         
         
         for z in range(201):
             for d in range(201):
                  #phit
                 if 0 <= z <= zmax:
-                    phit_i=1/math.sqrt(2*self.sigma_hit)*math.exp((-(z-d)**2)/(2*self.sigma_hit**2))
+                    phit_i=1.0/np.sqrt(2.0*math.pi*self.sigma_hit**2.0)*np.exp((-(z-d)**2.0)/(2.0*self.sigma_hit**2))
                 else:
                     phit_i=0
-                phit[d,z]=phit_i
+                phit[z,d]=phit_i
                 
-        summed=np.sum(phit,axis=1,keepdims=True)
+        summed=np.sum(phit,axis=0,keepdims=True)
         phit_norm= phit/summed
            
         for z in range(201):
@@ -98,7 +98,7 @@ class SensorModel:
                 
                 #pshort
                 if 0 <= z <= d and d!=0:
-                    pshort=2/d*(1-z/d)
+                    pshort=(2.0/d)*(1-z/d)
                 else:
                     pshort=0
                     
@@ -110,12 +110,14 @@ class SensorModel:
                     
                 #prand
                 if 0 <= z <= zmax:
-                    prand=1/zmax
+                    prand=1.0/zmax
                 else:
                     prand=0
-                self.sensor_model_table[d,z]=self.alpha_hit*phit_norm[d,z]+self.alpha_short*pshort+self.alpha_max*pmax+self.alpha_rand*prand
-        summed=np.sum(self.sensor_model_table,axis=1,keepdims=True)
+                self.sensor_model_table[z,d]=self.alpha_hit*phit_norm[z,d] + self.alpha_short*pshort + self.alpha_max*pmax + self.alpha_rand*prand
+        summed=np.sum(self.sensor_model_table,axis=0,keepdims=True)
         self.sensor_model_table= self.sensor_model_table/summed
+        
+        
         
 
     def evaluate(self, particles, observation):
@@ -154,25 +156,31 @@ class SensorModel:
 
         ####################################
         zmax=200
+        scans=np.rint(scans).astype(np.uint16)
         scans=np.where(scans<0,0,scans)
         scans=np.where(scans>zmax,zmax,scans)
     
         
         
-        pix=observation*self.map_resolution*self.lidar_scale_to_map_scale
+        pix=observation*self.map_resolution #*scale change?
+        pix=np.rint(pix).astype(np.uint16)
         pix=np.where(pix<0,0,pix)
         pix=np.where(pix>zmax,zmax,pix)
         
         
         probs_whole=np.ones(np.size(scans))
-        for i in np.size(scans,2):
-            for j in np.size(scans,2):
-                probs_whole[i,j]=self.sensor_model_table[scans[i,j],pix[i,j]]
+        
+        for i in range(np.size(scans,0)):
+            for j in range(np.size(scans,1)):
+                aa=pix[j]
+                bb=scans[i,j]
+                dd=self.sensor_model_table[aa,bb]
+                # probs_whole[i,j]=(dd)**(1.0/2.2)
                 
         return np.sum(probs_whole,axis=1)
                 
         
-        
+    
         
         
 
@@ -180,7 +188,7 @@ class SensorModel:
         # Convert the map to a numpy array
         self.map = np.array(map_msg.data, np.double)/100.
         self.map = np.clip(self.map, 0, 1)
-
+        self.map_resolution=map_msg.info.resolution
         # Convert the origin to a tuple
         origin_p = map_msg.info.origin.position
         origin_o = map_msg.info.origin.orientation
