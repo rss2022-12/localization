@@ -9,6 +9,7 @@ from nav_msgs.msg import Odometry
 from geometry_msgs.msg import PoseWithCovarianceStamped
 import numpy as np
 import tf
+import threading
 
 class ParticleFilter:
 
@@ -41,7 +42,7 @@ class ParticleFilter:
         #     "Pose Estimate" feature in RViz, which publishes to
         #     /initialpose.
         self.pose_sub  = rospy.Subscriber("/initialpose", PoseWithCovarianceStamped,
-                                          self.pose_callback, # TODO: Fill this in
+                                          self.precompute_particles, # TODO: Fill this in
                                           queue_size=1)
 
         #  *Important Note #3:* You must publish your pose estimate to
@@ -58,7 +59,7 @@ class ParticleFilter:
         self.sensor_model = SensorModel()
         self.numparticles=50
         self.particles=None
-        self.precompute_particles()
+        self.lock = threading.Lock()
         # Implement the MCL algorithm
         # using the sensor model and the motion model
         #
@@ -66,50 +67,59 @@ class ParticleFilter:
         # your particles, ideally with some sort
         # of interactive interface in rviz
         #
-        
-        def precompute_particles(self):
-            self.particles = np.zeros((self.numparticles, 3))
-         
 
-            
-            
-            
-        def lidar_callback(self,particles,lidarscan):
+        
+    def precompute_particles(self, pose):
+        with self.lock:
+            self.particles = np.zeros((self.numparticles, 3))
+            self.particles[:, 0] = pose.pose.pose.position.x
+            self.particles[:, 1] = pose.pose.pose.position.y
+            self.particles[:, 2] = tf.transformations.euler_from_quaternion(pose.pose.pose.orientation)[2]
+            self.particles += np.random.normal(scale=0.01, size=self.particles.shape)
+
+        
+    def lidar_callback(self, lidarscan):
+        with self.lock:
             #Whenever you get sensor data use the sensor model to 
             #compute the particle probabilities. Then resample the
             #particles based on these probabilities
             
-            probs=self.sensor_model.evaluate(particles,lidarscan.ranges)
+            probs=self.sensor_model.evaluate(self.particles,lidarscan.ranges)
             
             num_particles=len(probs)
             ranges=np.arange(num_particles)            
             new_particles=np.random.choice(ranges,probs,p=probs)
-            self.particles=particles[new_particles]
+            self.particles=self.particles[new_particles]
             
             # #return mean of particles
             # self.x_mean=np.mean(self.particles[:,0])
             # self.y_mean=np.mean(self.particles[:,1])
             # self.theta_mean=np.arctan2(np.sin(self.particles[:,2]),np.cos(self.particles[:,2]))
             
-            
-            
-        def odom_callback(self,particles,odometry):
+            self.estimate_pose()
+        
+        
+    def odom_callback(self, odometry):
+        with self.lock:
             # Whenever you get odometry data use the motion model 
             # to update the particle positions
-            x=odometry.twist.linear.x
-            y=odometry.twist.linear.y
-            theta=np.arccos(odometry.twist.angular.x)
+            x=odometry.twist.twist.linear.x
+            y=odometry.twist.twist.linear.y
+            theta=np.arccos(odometry.twist.twist.angular.x)
             
             new_odom=[x,y,theta]
-            self.particles=self.MotionModel.evaluate(particles,new_odom)
+            self.particles=self.motion_model.evaluate(self.particles, new_odom)
             
             # #return mean of particles
             # self.x_mean=np.mean(self.particles[:,0])
             # self.y_mean=np.mean(self.particles[:,1])
             # self.theta_mean=np.arctan2(np.sin(self.particles[:,2]),np.cos(self.particles[:,2]))
-            
-            
-        def pose_callback(self,pose):
+
+            self.estimate_pose()
+
+
+    def estimate_pose(self):
+        with self.lock:
             #new odometry message
             new_pose=Odometry()
             
@@ -124,9 +134,9 @@ class ParticleFilter:
             
             #get quaternion and assign 
             pose_matrix=np.array([[np.cos(theta_mean),-np.sin(theta_mean), 0,x_mean],
-                                  [np.sin(theta_mean),np.cos(theta_mean),0,y_mean],
-                                  [0,0,1,0]
-                                  [0,0,0,1]])
+                                    [np.sin(theta_mean),np.cos(theta_mean),0,y_mean],
+                                    [0,0,1,0]
+                                    [0,0,0,1]])
             
             pose_quat=tf.transformations.quaternion_from_matrix(pose_matrix)
             
