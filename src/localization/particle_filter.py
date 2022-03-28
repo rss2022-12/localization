@@ -8,6 +8,7 @@ from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 import geometry_msgs.msg
 from geometry_msgs.msg import PoseWithCovarianceStamped
+from geometry_msgs.msg import TransformStamped
 import numpy as np
 import tf
 import tf2_ros
@@ -55,6 +56,8 @@ class ParticleFilter:
         self.numparticles=50
         self.particles=None
         self.lock = threading.Lock()
+
+        self.tfpub= rospy.Publisher(self.particle_filter_frame,TransformStamped, queue_size =1)
         
         #broadcaster for frame
         
@@ -74,7 +77,10 @@ class ParticleFilter:
             self.particles = np.zeros((self.numparticles, 3))
             self.particles[:, 0] = pose.pose.pose.position.x
             self.particles[:, 1] = pose.pose.pose.position.y
-            self.particles[:, 2] = tf.transformations.euler_from_quaternion(pose.pose.pose.orientation)[2]
+            print(pose.pose.pose.orientation)
+            quat= [pose.pose.pose.orientation.x,pose.pose.pose.orientation.y,pose.pose.pose.orientation.z,pose.pose.pose.orientation.w]
+            print(quat)
+            self.particles[:, 2] = tf.transformations.euler_from_quaternion(quat)[2]
             self.particles += np.random.normal(scale=0.01, size=self.particles.shape)
 
         
@@ -83,8 +89,8 @@ class ParticleFilter:
             #Whenever you get sensor data use the sensor model to 
             #compute the particle probabilities. Then resample the
             #particles based on these probabilities
-            
-            probs=self.sensor_model.evaluate(self.particles,lidarscan.ranges)
+            lidar_range= np.array(lidarscan.ranges) 
+            probs=self.sensor_model.evaluate(self.particles,lidar_range)
             
             num_particles=len(probs)
             ranges=np.arange(num_particles)            
