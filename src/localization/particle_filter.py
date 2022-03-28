@@ -56,7 +56,7 @@ class ParticleFilter:
         # and the particle_filter_frame.
         self.motion_model = MotionModel()
         self.sensor_model = SensorModel()
-        self.numparticles=5
+        self.numparticles=100
         self.particles=np.zeros((self.numparticles, 3))
         self.lock = threading.Lock()
 
@@ -148,7 +148,7 @@ class ParticleFilter:
         #calculate mean of new pose
         x_mean=np.mean(self.particles[:,0])
         y_mean=np.mean(self.particles[:,1])
-        theta_mean=np.arctan2(np.sum(np.sin(self.particles[:,2])),np.sum(np.cos(self.particles[:,2])))
+        theta_mean=np.arctan2(np.mean(np.sin(self.particles[:,2])),np.mean(np.cos(self.particles[:,2])))
         
         #assign x y values in odometry message
         new_pose.pose.pose.position.x=x_mean
@@ -163,6 +163,9 @@ class ParticleFilter:
         
         pose_quat=tf.transformations.quaternion_from_matrix(pose_matrix)
         
+         # Add the source and target frame
+        new_pose.header.frame_id =  "map"
+        new_pose.child_frame_id =   self.particle_filter_frame
         
         new_pose.pose.pose.orientation.x= pose_quat[0]
         new_pose.pose.pose.orientation.y= pose_quat[1]
