@@ -7,7 +7,7 @@ from motion_model import MotionModel
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 import geometry_msgs.msg
-from geometry_msg.msg import PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped
 import numpy as np
 import tf
 import tf2_ros
