@@ -173,7 +173,7 @@ class SensorModel:
                 dd = self.sensor_model_table[aa, bb]
                 probs_whole[i] *= (dd)**(1.0/2.2)
 
-        rospy.loginfo(np.shape(scans))
+        # rospy.loginfo(np.shape(scans))
         return probs_whole
 
     def map_callback(self, map_msg):
