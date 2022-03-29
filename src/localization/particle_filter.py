@@ -56,23 +56,23 @@ class ParticleFilter:
         #     "/map" frame.
         self.odom_pub  = rospy.Publisher("/pf/pose/odom", Odometry, queue_size = 1)
         
-        # Initialize the models. Publish a transformation frame between the map
-        # and the particle_filter_frame.
+        # Initialize the models and particles. 
         self.motion_model = MotionModel()
         self.sensor_model = SensorModel()
         self.numparticles=200
         self.particles=np.zeros((self.numparticles, 3))
-        self.last_odom_time = rospy.Time.now()
-        self.lock = threading.Lock()
-
+     
         self.tfpub= rospy.Publisher(self.particle_filter_frame,TransformStamped, queue_size =1)
         
         #broadcaster for frame
-        
         self.broadcast= tf2_ros.TransformBroadcaster()
-        self.prev_time=0
-        self.cur_time=0
-        
+  
+        #keep track of time for odom
+        self.last_odom_time = rospy.Time.now()
+  
+        #threading
+        self.lock = threading.Lock()
+
         # Implement the MCL algorithm
         # using the sensor model and the motion model
         #
@@ -91,11 +91,13 @@ class ParticleFilter:
         if self.map_acquired:
             # self.lock.acquire()
             self.particles = np.zeros((self.numparticles, 3))
+            
+            #acquire 2d pose estimate location and initialize particles there
             self.particles[:, 0] = pose.pose.pose.position.x
             self.particles[:, 1] = pose.pose.pose.position.y
             print(pose.pose.pose.orientation)
             quat= [pose.pose.pose.orientation.x,pose.pose.pose.orientation.y,pose.pose.pose.orientation.z,pose.pose.pose.orientation.w]
-            # print(quat)
+
             self.particles[:, 2] = tf.transformations.euler_from_quaternion(quat)[2]
             self.particles += np.random.normal(scale=0.01, size=self.particles.shape)
             # self.lock.release()
@@ -110,28 +112,24 @@ class ParticleFilter:
                 #compute the particle probabilities. Then resample the
                 #particles based on these probabilities
 
-            # print(self.particles)
+            #apply sensor model on lidar data
             probs=self.sensor_model.evaluate(self.particles,np.array(lidarscan.ranges))
         
+            #normalize lidar data
             summed = np.sum(probs)
             probs = probs/summed
+            
+            #resample particles
             ranges=np.arange(self.numparticles)            
             new_particles=np.random.choice(ranges,self.numparticles,p=probs)
-        
-            # print(np.shape(new_particles))
-            # self.particles= np.zeros((self.numparticles, 3))
             self.particles=self.particles[new_particles]
-            # print(np.shape(self.particles))
+        
                 
 
-                
-                # #return mean of particles
-                # self.x_mean=np.mean(self.particles[:,0])
-                # self.y_mean=np.mean(self.particles[:,1])
-                # self.theta_mean=np.arctan2(np.sin(self.particles[:,2]),np.cos(self.particles[:,2]))
             
             # self.lock.release()
             
+            #calculate mean and publish mean pose
             self.estimate_pose()
 
 
@@ -142,26 +140,26 @@ class ParticleFilter:
             # with self.lock:
                 # Whenever you get odometry data use the motion model 
                 # to update the particle positions
+           
+            #acquire odometry data velocities
             x=odometry.twist.twist.linear.x
             y=odometry.twist.twist.linear.y
             theta=odometry.twist.twist.angular.z
             
+            #calculate delta t to convert velocity to position change
             current_time = rospy.Time.now()
             dt = float(current_time.nsecs)/(10.0**9.0) - float(self.last_odom_time.nsecs)/(10.0**9.0)
             self.last_odom_time = current_time
+            
             new_odom=[x*dt,y*dt,theta*dt]
-            # new_odom=[x,y,theta]
+        
+            #apply motion model to acquire new particles
             self.particles=self.motion_model.evaluate(self.particles, new_odom)
-            
-            self.prev_time=self.cur_time
-            
-            # #return mean of particles
-            # self.x_mean=np.mean(self.particles[:,0])
-            # self.y_mean=np.mean(self.particles[:,1])
-            # self.theta_mean=np.arctan2(np.sin(self.particles[:,2]),np.cos(self.particles[:,2]))
-
+         
+           
             # self.lock.release()
-
+            
+            #take mean and publish mean pose
             self.estimate_pose()
 
 
