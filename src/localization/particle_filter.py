@@ -67,7 +67,8 @@ class ParticleFilter:
         #broadcaster for frame
         
         self.broadcast= tf2_ros.TransformBroadcaster()
-        self.first = True
+        self.prev_time=0
+        self.cur_time=0
         
         # Implement the MCL algorithm
         # using the sensor model and the motion model
@@ -139,13 +140,18 @@ class ParticleFilter:
             # with self.lock:
                 # Whenever you get odometry data use the motion model 
                 # to update the particle positions
-            x=odometry.pose.pose.position.x
-            y=odometry.pose.pose.position.y
-            quat= [odometry.pose.pose.orientation.x,odometry.pose.pose.orientation.y,odometry.pose.pose.orientation.z,odometry.pose.pose.orientation.w]
-            theta = tf.transformations.euler_from_quaternion(quat)[2]
-            
-            new_odom=[x,y,theta]
+            x=odometry.twist.twist.linear.x
+            y=odometry.twist.twist.linear.y
+            theta=odometry.twist.twist.angular.z
+            # quat= [odometry.pose.pose.orientation.x,odometry.pose.pose.orientation.y,odometry.pose.pose.orientation.z,odometry.pose.pose.orientation.w]
+            # theta = tf.transformations.euler_from_quaternion(quat)[2]
+           
+            self.cur_time=rospy.get_time()
+            dt=self.cur_time-self.prev_time
+            new_odom=[x*dt,y*dt,theta*dt]
             self.particles=self.motion_model.evaluate(self.particles, new_odom)
+            
+            self.prev_time=self.cur_time
             
             # #return mean of particles
             # self.x_mean=np.mean(self.particles[:,0])
@@ -182,7 +188,9 @@ class ParticleFilter:
             
             pose_quat=tf.transformations.quaternion_from_matrix(pose_matrix)
             
-            
+            # Add the source and target frame
+            new_pose.header.frame_id =  "map"
+            new_pose.child_frame_id =   self.particle_filter_frame
             new_pose.pose.pose.orientation.x= pose_quat[0]
             new_pose.pose.pose.orientation.y= pose_quat[1]
             new_pose.pose.pose.orientation.z= pose_quat[2]
