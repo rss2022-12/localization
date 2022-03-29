@@ -18,6 +18,8 @@ import threading
 class ParticleFilter:
 
     def __init__(self):
+        self.map_acquired = False
+
         # Get parameters
         self.map_topic = rospy.get_param("~map_topic")
         self.particle_filter_frame = rospy.get_param("~particle_filter_frame")
@@ -60,6 +62,7 @@ class ParticleFilter:
         self.sensor_model = SensorModel()
         self.numparticles=200
         self.particles=np.zeros((self.numparticles, 3))
+        self.last_odom_time = rospy.Time.now()
         self.lock = threading.Lock()
 
         self.tfpub= rospy.Publisher(self.particle_filter_frame,TransformStamped, queue_size =1)
@@ -77,7 +80,6 @@ class ParticleFilter:
         # of interactive interface in rviz
         #
 
-        self.map_acquired = False
         self.map_sub  = rospy.Subscriber(self.map_topic, OccupancyGrid, self.map_received, queue_size=1)
 
 
@@ -139,12 +141,15 @@ class ParticleFilter:
             # with self.lock:
                 # Whenever you get odometry data use the motion model 
                 # to update the particle positions
-            x=odometry.pose.pose.position.x
-            y=odometry.pose.pose.position.y
-            quat= [odometry.pose.pose.orientation.x,odometry.pose.pose.orientation.y,odometry.pose.pose.orientation.z,odometry.pose.pose.orientation.w]
-            theta = tf.transformations.euler_from_quaternion(quat)[2]
+            x=odometry.twist.twist.linear.x
+            y=odometry.twist.twist.linear.y
+            theta=odometry.twist.twist.angular.z
             
-            new_odom=[x,y,theta]
+            current_time = rospy.Time.now()
+            dt = float(current_time.nsecs)/(10.0**9.0) - float(self.last_odom_time.nsecs)/(10.0**9.0)
+            self.last_odom_time = current_time
+            new_odom=[x*dt,y*dt,theta*dt]
+            # new_odom=[x,y,theta]
             self.particles=self.motion_model.evaluate(self.particles, new_odom)
             
             # #return mean of particles
@@ -163,6 +168,9 @@ class ParticleFilter:
             # with self.lock:
                 #new odometry message
             new_pose=Odometry()
+
+            new_pose.header.frame_id = "/map"
+            new_pose.header.stamp = rospy.Time.now()
             
             #calculate mean of new pose
             x_mean=np.mean(self.particles[:,0])
