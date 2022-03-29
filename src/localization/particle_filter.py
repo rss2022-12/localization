@@ -80,6 +80,7 @@ class ParticleFilter:
         self.map_acquired = False
         self.map_sub  = rospy.Subscriber(self.map_topic, OccupancyGrid, self.map_received, queue_size=1)
 
+
     def map_received(self, map_message):
         self.map_acquired = True
 
