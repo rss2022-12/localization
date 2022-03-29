@@ -70,7 +70,8 @@ class ParticleFilter:
         #broadcaster for frame
         
         self.broadcast= tf2_ros.TransformBroadcaster()
-        self.first = True
+        self.prev_time=0
+        self.cur_time=0
         
         # Implement the MCL algorithm
         # using the sensor model and the motion model
@@ -152,6 +153,8 @@ class ParticleFilter:
             # new_odom=[x,y,theta]
             self.particles=self.motion_model.evaluate(self.particles, new_odom)
             
+            self.prev_time=self.cur_time
+            
             # #return mean of particles
             # self.x_mean=np.mean(self.particles[:,0])
             # self.y_mean=np.mean(self.particles[:,1])
@@ -190,7 +193,9 @@ class ParticleFilter:
             
             pose_quat=tf.transformations.quaternion_from_matrix(pose_matrix)
             
-            
+            # Add the source and target frame
+            new_pose.header.frame_id =  "map"
+            new_pose.child_frame_id =   self.particle_filter_frame
             new_pose.pose.pose.orientation.x= pose_quat[0]
             new_pose.pose.pose.orientation.y= pose_quat[1]
             new_pose.pose.pose.orientation.z= pose_quat[2]
