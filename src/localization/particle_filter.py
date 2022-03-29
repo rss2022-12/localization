@@ -56,7 +56,7 @@ class ParticleFilter:
         # and the particle_filter_frame.
         self.motion_model = MotionModel()
         self.sensor_model = SensorModel()
-        self.numparticles=5
+        self.numparticles=200
         self.particles=np.zeros((self.numparticles, 3))
         self.lock = threading.Lock()
 
@@ -78,7 +78,7 @@ class ParticleFilter:
         
     def precompute_particles(self, pose):
 
-        
+        # self.lock.acquire()
         self.particles = np.zeros((self.numparticles, 3))
         self.particles[:, 0] = pose.pose.pose.position.x
         self.particles[:, 1] = pose.pose.pose.position.y
@@ -87,10 +87,12 @@ class ParticleFilter:
         # print(quat)
         self.particles[:, 2] = tf.transformations.euler_from_quaternion(quat)[2]
         self.particles += np.random.normal(scale=0.01, size=self.particles.shape)
+        # self.lock.release()
 
 
         
     def lidar_callback(self, lidarscan):
+        # self.lock.acquire()
         # with self.lock:
             #Whenever you get sensor data use the sensor model to 
             #compute the particle probabilities. Then resample the
@@ -115,19 +117,22 @@ class ParticleFilter:
             # self.x_mean=np.mean(self.particles[:,0])
             # self.y_mean=np.mean(self.particles[:,1])
             # self.theta_mean=np.arctan2(np.sin(self.particles[:,2]),np.cos(self.particles[:,2]))
-            
+        
+        # self.lock.release()
+        
         self.estimate_pose()
 
 
         
     def odom_callback(self, odometry):
-        
+        # self.lock.acquire()
         # with self.lock:
             # Whenever you get odometry data use the motion model 
             # to update the particle positions
-        x=odometry.twist.twist.linear.x
-        y=odometry.twist.twist.linear.y
-        theta=np.arccos(odometry.twist.twist.angular.x)
+        x=odometry.pose.pose.position.x
+        y=odometry.pose.pose.position.y
+        quat= [odometry.pose.pose.orientation.x,odometry.pose.pose.orientation.y,odometry.pose.pose.orientation.z,odometry.pose.pose.orientation.w]
+        theta = tf.transformations.euler_from_quaternion(quat)[2]
         
         new_odom=[x,y,theta]
         self.particles=self.motion_model.evaluate(self.particles, new_odom)
@@ -137,10 +142,13 @@ class ParticleFilter:
         # self.y_mean=np.mean(self.particles[:,1])
         # self.theta_mean=np.arctan2(np.sin(self.particles[:,2]),np.cos(self.particles[:,2]))
 
+        # self.lock.release()
+
         self.estimate_pose()
 
 
     def estimate_pose(self):
+        # self.lock.acquire()
         # with self.lock:
             #new odometry message
         new_pose=Odometry()
@@ -193,6 +201,8 @@ class ParticleFilter:
         particletransform.transform.rotation.w = pose_quat[3]
         
         self.broadcast.sendTransform(particletransform)
+
+        # self.lock.release()
         
     
             
