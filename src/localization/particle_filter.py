@@ -14,6 +14,9 @@ import numpy as np
 import tf
 import tf2_ros
 import threading
+from geometry_msgs.msg import PoseArray
+from geometry_msgs.msg import Pose
+
 
 class ParticleFilter:
 
@@ -61,6 +64,8 @@ class ParticleFilter:
         self.sensor_model = SensorModel()
         self.numparticles=200
         self.particles=np.zeros((self.numparticles, 3))
+        
+        self.marker_pub= rospy.Publisher("/visualization_marker_array", PoseArray, queue_size=1)
      
         self.tfpub= rospy.Publisher(self.particle_filter_frame,TransformStamped, queue_size =1)
         
@@ -225,10 +230,25 @@ class ParticleFilter:
             self.broadcast.sendTransform(particletransform)
 
             # self.lock.release()
+            
+            
         
-    
+            #-------------------------------POSES FOR PARTICLES ------------------------------------------#
             
+            self.particle_array=PoseArray()
             
+            for i in np.arange(self.numparticles):
+                pose = Pose()
+               
+                pose.position.x = self.particles[i,0]
+                pose.position.y = self.particles[i,1]
+                pose.orientation.x= self.particles[i,0]
+                pose.orientation.y= self.particles[i,1]
+                
+                self.particle_array.poses.append(pose)
+            
+            self.particle_array.header.frame_id = "map"
+            self.marker_pub.publish(self.particle_array)
             
             
 
