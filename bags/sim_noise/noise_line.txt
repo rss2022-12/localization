@@ -1,0 +1,2 @@
+new_odom=[(x+np.random.normal(scale=0.15))*dt,(y+np.random.normal(scale=0.15))*dt,(theta+np.random.normal(scale=0.1))*dt]
+        

@@ -156,7 +156,8 @@ class ParticleFilter:
             dt = float(current_time.nsecs)/(10.0**9.0) - float(self.last_odom_time.nsecs)/(10.0**9.0)
             self.last_odom_time = current_time
             
-            new_odom=[x*dt,y*dt,theta*dt]
+            #new_odom=[x*dt,y*dt,theta*dt]
+            new_odom=[(x+np.random.normal(scale=0.15))*dt,(y+np.random.normal(scale=0.15))*dt,(theta+np.random.normal(scale=0.1))*dt]
         
             #apply motion model to acquire new particles
             self.particles=self.motion_model.evaluate(self.particles, new_odom)
