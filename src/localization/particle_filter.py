@@ -18,6 +18,8 @@ from geometry_msgs.msg import PoseArray
 from geometry_msgs.msg import Pose
 
 
+
+
 class ParticleFilter:
 
     def __init__(self):
@@ -59,25 +61,26 @@ class ParticleFilter:
         #     "/map" frame.
         self.odom_pub  = rospy.Publisher("/pf/pose/odom", Odometry, queue_size = 1)
         
-        # Initialize the models and particles. 
+        self.marker_pub= rospy.Publisher("/visualization_marker_array", PoseArray, queue_size=1)
+
+        # Initialize the models. Publish a transformation frame between the map
+        # and the particle_filter_frame.
         self.motion_model = MotionModel()
         self.sensor_model = SensorModel()
         self.numparticles=200
         self.particles=np.zeros((self.numparticles, 3))
+        self.last_odom_time = rospy.Time.now()
+        self.lock = threading.Lock()
+        self.lastmsg=None
         
-        self.marker_pub= rospy.Publisher("/visualization_marker_array", PoseArray, queue_size=1)
-     
         self.tfpub= rospy.Publisher(self.particle_filter_frame,TransformStamped, queue_size =1)
         
         #broadcaster for frame
+        
         self.broadcast= tf2_ros.TransformBroadcaster()
-  
-        #keep track of time for odom
-        self.last_odom_time = rospy.Time.now()
-  
-        #threading
-        self.lock = threading.Lock()
-
+        self.prev_time=0
+        self.cur_time=0
+        
         # Implement the MCL algorithm
         # using the sensor model and the motion model
         #
@@ -96,13 +99,11 @@ class ParticleFilter:
         if self.map_acquired:
             # self.lock.acquire()
             self.particles = np.zeros((self.numparticles, 3))
-            
-            #acquire 2d pose estimate location and initialize particles there
             self.particles[:, 0] = pose.pose.pose.position.x
             self.particles[:, 1] = pose.pose.pose.position.y
             print(pose.pose.pose.orientation)
             quat= [pose.pose.pose.orientation.x,pose.pose.pose.orientation.y,pose.pose.pose.orientation.z,pose.pose.pose.orientation.w]
-
+            # print(quat)
             self.particles[:, 2] = tf.transformations.euler_from_quaternion(quat)[2]
             self.particles += np.random.normal(scale=0.01, size=self.particles.shape)
             # self.lock.release()
@@ -110,67 +111,79 @@ class ParticleFilter:
 
         
     def lidar_callback(self, lidarscan):
+        
         if self.map_acquired:
-            # self.lock.acquire()
+            self.lock.acquire()
             # with self.lock:
                 #Whenever you get sensor data use the sensor model to 
                 #compute the particle probabilities. Then resample the
                 #particles based on these probabilities
 
-            #apply sensor model on lidar data
+            # print(self.particles)
             probs=self.sensor_model.evaluate(self.particles,np.array(lidarscan.ranges))
         
-            #normalize lidar data
             summed = np.sum(probs)
             probs = probs/summed
-            
-            #resample particles
             ranges=np.arange(self.numparticles)            
             new_particles=np.random.choice(ranges,self.numparticles,p=probs)
-            self.particles=self.particles[new_particles]
         
+            # print(np.shape(new_particles))
+            # self.particles= np.zeros((self.numparticles, 3))
+            self.particles=self.particles[new_particles]
+            # print(np.shape(self.particles))
                 
 
+                
+                # #return mean of particles
+                # self.x_mean=np.mean(self.particles[:,0])
+                # self.y_mean=np.mean(self.particles[:,1])
+                # self.theta_mean=np.arctan2(np.sin(self.particles[:,2]),np.cos(self.particles[:,2]))
             
-            # self.lock.release()
+            self.lock.release()
             
-            #calculate mean and publish mean pose
             self.estimate_pose()
 
 
         
     def odom_callback(self, odometry):
         if self.map_acquired:
-            # self.lock.acquire()
+            self.lock.acquire()
             # with self.lock:
                 # Whenever you get odometry data use the motion model 
                 # to update the particle positions
-           
-            #acquire odometry data velocities
             x=odometry.twist.twist.linear.x
             y=odometry.twist.twist.linear.y
             theta=odometry.twist.twist.angular.z
             
-            #calculate delta t to convert velocity to position change
-            current_time = rospy.Time.now()
-            dt = float(current_time.nsecs)/(10.0**9.0) - float(self.last_odom_time.nsecs)/(10.0**9.0)
-            self.last_odom_time = current_time
-            
+            if self.lastmsg==None:
+                dt=0
+                self.lastmsg=odometry
+            else:
+                last_time = self.lastmsg.header.stamp.to_sec()
+                dt = odometry.header.stamp.to_sec()-last_time
+                self.lastmsg = odometry
+                
             new_odom=[x*dt,y*dt,theta*dt]
-        
-            #apply motion model to acquire new particles
+            # new_odom=[x,y,theta]
             self.particles=self.motion_model.evaluate(self.particles, new_odom)
-         
-           
-            # self.lock.release()
             
-            #take mean and publish mean pose
+            
+          
+            # self.prev_time=self.cur_time
+            
+            # #return mean of particles
+            # self.x_mean=np.mean(self.particles[:,0])
+            # self.y_mean=np.mean(self.particles[:,1])
+            # self.theta_mean=np.arctan2(np.sin(self.particles[:,2]),np.cos(self.particles[:,2]))
+
+            self.lock.release()
+
             self.estimate_pose()
 
 
     def estimate_pose(self):
         if self.map_acquired:
-            # self.lock.acquire()
+            self.lock.acquire()
             # with self.lock:
                 #new odometry message
             new_pose=Odometry()
@@ -179,8 +192,8 @@ class ParticleFilter:
             new_pose.header.stamp = rospy.Time.now()
             
             #calculate mean of new pose
-            x_mean=np.mean(self.particles[:,0])
-            y_mean=np.mean(self.particles[:,1])
+            x_mean=np.average(self.particles[:,0])
+            y_mean=np.average(self.particles[:,1])
             theta_mean=np.arctan2(np.sum(np.sin(self.particles[:,2])),np.sum(np.cos(self.particles[:,2])))
             
             #assign x y values in odometry message
@@ -214,6 +227,7 @@ class ParticleFilter:
             # Add the source and target frame
             particletransform.header.frame_id =  "map"
             particletransform.child_frame_id =   self.particle_filter_frame
+            particletransform.header.stamp = rospy.Time.now()
             
             # # Add the translation
             particletransform.header.stamp=rospy.Time.now()
@@ -229,12 +243,8 @@ class ParticleFilter:
             
             self.broadcast.sendTransform(particletransform)
 
-            # self.lock.release()
             
-            
-        
-            #-------------------------------POSES FOR PARTICLES ------------------------------------------#
-            
+             
             self.particle_array=PoseArray()
             
             for i in np.arange(self.numparticles):
@@ -249,6 +259,11 @@ class ParticleFilter:
             
             self.particle_array.header.frame_id = "map"
             self.marker_pub.publish(self.particle_array)
+            
+            self.lock.release()
+    
+            
+            
             
             
 
