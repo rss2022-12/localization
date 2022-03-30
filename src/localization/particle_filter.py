@@ -155,6 +155,7 @@ class ParticleFilter:
             y=odometry.twist.twist.linear.y
             theta=odometry.twist.twist.angular.z
             
+
             if self.lastmsg==None:
                 dt=0
                 self.lastmsg=odometry
@@ -165,6 +166,7 @@ class ParticleFilter:
                 
             new_odom=[x*dt,y*dt,theta*dt]
             # new_odom=[x,y,theta]
+
             self.particles=self.motion_model.evaluate(self.particles, new_odom)
             
             
