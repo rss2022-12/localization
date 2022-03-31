@@ -72,6 +72,7 @@ class ParticleFilter:
         self.last_odom_time = rospy.Time.now()
         self.lock = threading.Lock()
         self.lastmsg=None
+        self.weights=None
         
         self.tfpub= rospy.Publisher(self.particle_filter_frame,TransformStamped, queue_size =1)
         
@@ -118,12 +119,13 @@ class ParticleFilter:
                 #Whenever you get sensor data use the sensor model to 
                 #compute the particle probabilities. Then resample the
                 #particles based on these probabilities
-
+                
             # print(self.particles)
             probs=self.sensor_model.evaluate(self.particles,np.array(lidarscan.ranges))
         
             summed = np.sum(probs)
             probs = probs/summed
+            self.weights=probs
             ranges=np.arange(self.numparticles)            
             new_particles=np.random.choice(ranges,self.numparticles,p=probs)
         
@@ -141,7 +143,8 @@ class ParticleFilter:
             
             self.lock.release()
             
-            self.estimate_pose()
+            if self.weights is not None:
+                self.estimate_pose()
 
 
         
@@ -164,8 +167,9 @@ class ParticleFilter:
                 dt = odometry.header.stamp.to_sec()-last_time
                 self.lastmsg = odometry
                 
+            # new_odom=[(x+np.random.normal(scale=0.06))*dt,(y+np.random.normal(scale=0.06))*dt,(theta+np.random.normal(scale=0.06))*dt]
             new_odom=[x*dt,y*dt,theta*dt]
-            # new_odom=[x,y,theta]
+            # new_odom=[x,y,theta
 
             self.particles=self.motion_model.evaluate(self.particles, new_odom)
             
@@ -179,8 +183,9 @@ class ParticleFilter:
             # self.theta_mean=np.arctan2(np.sin(self.particles[:,2]),np.cos(self.particles[:,2]))
 
             self.lock.release()
-
-            self.estimate_pose()
+            
+            if self.weights is not None:
+                self.estimate_pose()
 
 
     def estimate_pose(self):
@@ -194,8 +199,8 @@ class ParticleFilter:
             new_pose.header.stamp = rospy.Time.now()
             
             #calculate mean of new pose
-            x_mean=np.average(self.particles[:,0])
-            y_mean=np.average(self.particles[:,1])
+            x_mean=np.average(self.particles[:,0],weights=self.weights)
+            y_mean=np.average(self.particles[:,1],weights=self.weights)
             theta_mean=np.arctan2(np.sum(np.sin(self.particles[:,2])),np.sum(np.cos(self.particles[:,2])))
             
             #assign x y values in odometry message
@@ -209,7 +214,10 @@ class ParticleFilter:
                                     [0,0,0,1]])
             
             
-            pose_quat=tf.transformations.quaternion_from_matrix(pose_matrix)
+            # pose_quat=tf.transformations.quaternion_from_matrix(pose_matrix)
+
+            pose_quat=tf.transformations.quaternion_from_euler(0,0,theta_mean)
+
             
             # Add the source and target frame
             new_pose.header.frame_id =  "map"

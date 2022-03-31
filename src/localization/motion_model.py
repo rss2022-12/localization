@@ -54,8 +54,10 @@ class MotionModel:
         R_parts[:, 2, 1] = 0.0
         R_parts[:, 2, 2] = 1.0
         particles += np.matmul(R_parts, odometry)
-        particles += np.random.normal(scale=0.05, size=particles.shape)
-
+        # particles += np.random.normal(scale=0.001, size=particles.shape)
+        particles[:,2]+=np.random.normal(scale=0.03,size=particles[:,2].shape)
+        particles[:,1]+=np.random.normal(scale=0.01,size=particles[:,1].shape)
+        particles[:,0]+=np.random.normal(scale=0.01, loc=0.01,size=particles[:,0].shape)
         return particles
 
         ####################################

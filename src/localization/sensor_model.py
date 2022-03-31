@@ -6,6 +6,7 @@ import rospy
 import tf
 from nav_msgs.msg import OccupancyGrid
 from tf.transformations import quaternion_from_euler
+from sensor_msgs.msg import LaserScan
 import math as math
 
 
@@ -19,7 +20,7 @@ class SensorModel:
         self.scan_theta_discretization = rospy.get_param(
             "~scan_theta_discretization")
         self.scan_field_of_view = rospy.get_param("~scan_field_of_view")
-        self.lidar_scale_to_map_scale = 1
+        self.lidar_scale_to_map_scale = 20
         ####################################
         # TODO
         # Adjust these parameters
@@ -38,6 +39,7 @@ class SensorModel:
         # Precompute the sensor model table
         self.sensor_model_table = None
         self.precompute_sensor_model()
+        self.laser_pub = rospy.Publisher("pf/scan", LaserScan, queue_size = 1)
 
         # Create a simulated laser scan
         self.scan_sim = PyScanSimulator2D(
@@ -160,6 +162,17 @@ class SensorModel:
         scans = np.clip(scans, 0, zmax)
 
         pix = observation/(self.map_resolution*self.lidar_scale_to_map_scale)
+        #rospy.loginfo(pix.shape)
+        laser = LaserScan()
+        laser.header.stamp = rospy.Time.now()
+        laser.header.frame_id = "base_link_pf"
+        laser.angle_min = -2.35619449615
+        laser.angle_max = 2.35619449615
+        laser.angle_increment = 0.00436332309619
+        laser.range_min = 0
+        laser.range_max = 200
+        laser.ranges = pix
+        self.laser_pub.publish(laser)
         pix = np.rint(pix).astype(np.uint16)
 
         pix = np.clip(pix, 0, zmax)
@@ -171,7 +184,7 @@ class SensorModel:
                 aa = int(pix[j])
                 bb = int(scans[i, j])
                 dd = self.sensor_model_table[aa, bb]
-                probs_whole[i] *= (dd)**(1.0/2.2)
+                probs_whole[i] *= (dd)**(1.0/1.1)
 
         # rospy.loginfo(np.shape(scans))
         return probs_whole
