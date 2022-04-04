@@ -11,13 +11,13 @@ def poster():
     
     ipose=PoseWithCovarianceStamped()
     ipose.header.frame_id="map"
-    ipose.pose.pose.position.x=-21.47825
-    ipose.pose.pose.position.y=1.5059
+    ipose.pose.pose.position.x=-15.413
+    ipose.pose.pose.position.y=10.18536
     ipose.pose.pose.position.z=0
 
-    ipose.pose.pose.orientation.z=0.6055
-    ipose.pose.pose.orientation.w=0.7958
-    ipose.pose.covariance=[0.25,0,0,0,0,0,0,0.25,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0685389]
+    ipose.pose.pose.orientation.z=0.39342
+    ipose.pose.pose.orientation.w=0.91935
+    #ipose.pose.covariance=[0.25,0,0,0,0,0,0,0.25,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0685389]
     pub.publish(ipose)
 
 
