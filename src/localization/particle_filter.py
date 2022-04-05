@@ -114,14 +114,19 @@ class ParticleFilter:
     def lidar_callback(self, lidarscan):
         
         if self.map_acquired:
+<<<<<<< HEAD
             
             # self.lock.acquire()
+=======
+            self.lock.acquire()
+>>>>>>> ff16cd35c64011114325e891655c4c0bef18a504
             # with self.lock:
                 #Whenever you get sensor data use the sensor model to 
                 #compute the particle probabilities. Then resample the
                 #particles based on these probabilities
                 
             # print(self.particles)
+<<<<<<< HEAD
 
             downsampled_p=np.array(lidarscan.ranges)
             step_size=int(np.round(len(downsampled_p)/100))
@@ -129,6 +134,9 @@ class ParticleFilter:
 
 
             probs=self.sensor_model.evaluate(self.particles,downsampled_p)
+=======
+            probs=self.sensor_model.evaluate(self.particles,np.array(lidarscan.ranges))
+>>>>>>> ff16cd35c64011114325e891655c4c0bef18a504
         
             summed = np.sum(probs)
             probs = probs/summed
@@ -148,7 +156,7 @@ class ParticleFilter:
                 # self.y_mean=np.mean(self.particles[:,1])
                 # self.theta_mean=np.arctan2(np.sin(self.particles[:,2]),np.cos(self.particles[:,2]))
             
-            # self.lock.release()
+            self.lock.release()
             
             if self.weights is not None:
                 self.estimate_pose()
@@ -157,7 +165,7 @@ class ParticleFilter:
         
     def odom_callback(self, odometry):
         if self.map_acquired:
-            # self.lock.acquire()
+            self.lock.acquire()
             # with self.lock:
                 # Whenever you get odometry data use the motion model 
                 # to update the particle positions
@@ -179,6 +187,7 @@ class ParticleFilter:
             # new_odom=[x,y,theta
 
             self.particles=self.motion_model.evaluate(self.particles, new_odom)
+<<<<<<< HEAD
             
             
           
@@ -191,13 +200,27 @@ class ParticleFilter:
 
             # self.lock.release()
             
+=======
+            
+            
+          
+            # self.prev_time=self.cur_time
+            
+            # #return mean of particles
+            # self.x_mean=np.mean(self.particles[:,0])
+            # self.y_mean=np.mean(self.particles[:,1])
+            # self.theta_mean=np.arctan2(np.sin(self.particles[:,2]),np.cos(self.particles[:,2]))
+
+            self.lock.release()
+            
+>>>>>>> ff16cd35c64011114325e891655c4c0bef18a504
             if self.weights is not None:
                 self.estimate_pose()
 
 
     def estimate_pose(self):
         if self.map_acquired:
-            # self.lock.acquire()
+            self.lock.acquire()
             # with self.lock:
                 #new odometry message
             new_pose=Odometry()
@@ -277,7 +300,11 @@ class ParticleFilter:
             self.particle_array.header.frame_id = "map"
             self.marker_pub.publish(self.particle_array)
             
+<<<<<<< HEAD
             # self.lock.release()
+=======
+            self.lock.release()
+>>>>>>> ff16cd35c64011114325e891655c4c0bef18a504
     
             
             

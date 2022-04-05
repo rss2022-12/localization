@@ -55,9 +55,15 @@ class MotionModel:
         R_parts[:, 2, 2] = 1.0
 
         n=len(particles)
+<<<<<<< HEAD
         x_n= np.random.normal(odometry[0],scale=0.01,size=n)
         y_n=np.random.normal(odometry[1],scale=0.01,size=n)
         theta_n=np.random.normal(odometry[2],scale=0.01,size=n)
+=======
+        x_n= np.random.normal(odometry[0]+0.01,scale=0.03,size=n)
+        y_n=np.random.normal(odometry[1],scale=0.03,size=n)
+        theta_n=np.random.normal(odometry[2],scale=0.03,size=n)
+>>>>>>> ff16cd35c64011114325e891655c4c0bef18a504
 
         odom_noisy=np.reshape(np.vstack((x_n,y_n,theta_n)).T, (n, 3, 1))
 
